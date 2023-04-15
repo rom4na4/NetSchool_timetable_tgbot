@@ -4,6 +4,7 @@
 #####################################################
 
 import logging  # Библиотека для обработчика событий в виде Логов
+from datetime import date, timedelta
 
 from aiogram import types, Dispatcher  # Стандартная библиотека aiogram, использование типов данных и диспетчера событий
 from aiogram.dispatcher import FSMContext  # Библиотека aiogram, для работы с автоматом состояний
@@ -13,7 +14,10 @@ from netschoolapi import NetSchoolAPI  # Библиотека для работ�
 from create_bot import bot, dp  # Взять из файла create_bot поля bot и dp
 from json_work import write_json, read_json  # Взять из файла json_work функции write_json и read_json
 from keyboards import keyboards_client_step1, keyboards_client_step2, \
-    keyboards_client_step3, keyboards_client_step4  # Импортирование клавиатур из папки с клавиатурами
+    keyboards_client_step3, keyboards_client_step4, keyboards_client_step5, \
+    keyboards_client_step6, keyboards_client_step7, keyboards_client_step8, \
+    keyboards_client_step9, keyboards_client_step10, \
+    keyboards_client_step11  # Импортирование клавиатур из папки с клавиатурами
 
 # функция по обработки логов в консоли
 logging.basicConfig(level=logging.INFO)
@@ -38,6 +42,12 @@ class LocalFSM(StatesGroup):
     password_conf = State()  # Шаг 4: Запись Подтверждения_Пароля пользователя
     SchoolName = State()  # Шаг 5: Запись Школы пользователя
     auth = State()  # Шаг 6: Авторизация пользователя в системе -> None
+    timetable_week = State()
+    timetable_day = State()
+    homework_week = State()
+    homework_day = State()
+    mark_week = State()
+    mark_day = State()
 
 
 # Ограниченный словарь Школ
@@ -55,7 +65,7 @@ schools_dict = [
 async def start(message: types.Message):  # Работает по команде /start
     await bot.send_sticker(message.from_user.id,
                            sticker='CAACAgEAAxkBAAEIEiBkCqVNHsCtXOfYvGEfsy0Hh6wdbQAC-AEAAjgOghFb9OZ62rUyZC8E')
-    await message.answer("👋 Привет! Я твой бот-помошник в сетевом городе!", reply_markup=keyboards_client_step1)
+    await message.answer("👋 Привет! Я твой бот-помощник в сетевом городе!", reply_markup=keyboards_client_step1)
     await message.answer("Я могу присылать тебе:\n - 🗓*текущее расписание*,\n - 📚*домашнее задание*,"
                          "\n - 💯*оценки по предметам*", parse_mode='Markdown')
 
@@ -86,23 +96,26 @@ async def get_text_messages(message: types.Message, state: FSMContext):  # Ра�
             await message.answer('\- *Подсказка*: ||Обычно его вам выдают в школе||', parse_mode='Markdownv2')
             await state.set_state(LocalFSM.login.state)
         else:  # Проверка авторизован пользователь ранее или нет (если да)
-            await message.answer('Вы уже авторизовывались ранее! Переводим вас в рабочий режим! 💪')
+            await message.answer('Вы уже авторизовывались ранее! Переводим вас в рабочий режим! 💪',
+                                 reply_markup=keyboards_client_step7)
             await state.set_state(LocalFSM.auth.state)
     # -----------------------------------------------------------------------------
     elif message.text == '📚 Домашнее задание':  # При вводе 📚 Домашнее задание будет ->
-        await message.answer(f'Скоро я научусь присылать вам домашнее задание!',
-                             reply_markup=keyboards_client_step3, parse_mode='Markdown')
-        # Тут идёт блок кода для работы с домашним заданием - его я добавлю позднее
+        await message.answer(
+            f'Текущая дата на сегодня: {date.today()} \n Выберите действие для вывода домашнего задания!',
+            reply_markup=keyboards_client_step8, parse_mode='Markdown')
+        await state.set_state(LocalFSM.homework_week.state)
     # -----------------------------------------------------------------------------
     elif message.text == '🕒 Расписание':  # При вводе 🕒 Расписание будет ->
-        await message.answer(f'Скоро я научусь присылать вам Расписание!',
-                             reply_markup=keyboards_client_step3, parse_mode='Markdown')
-        # Тут идёт блок кода для работы с расписанием - его я добавлю позднее
+        await message.answer(f'Текущая дата на сегодня: {date.today()} \n Выберите действие для вывода расписания!',
+                             reply_markup=keyboards_client_step5, parse_mode='Markdown')
+        await state.set_state(LocalFSM.timetable_week.state)
     # -----------------------------------------------------------------------------
     elif message.text == '💯 Оценки':  # При вводе 💯 Оценки будет ->
-        await message.answer(f'Скоро я научусь присылать вам Оценки!',
-                             reply_markup=keyboards_client_step3, parse_mode='Markdown')
-        # Тут идёт блок кода для работы с оценками - его я добавлю позднее
+        await message.answer(
+            f'Текущая дата на сегодня: {date.today()} \n Выберите действие для вывода Оценок!',
+            reply_markup=keyboards_client_step10, parse_mode='Markdown')
+        await state.set_state(LocalFSM.mark_week.state)
     # -----------------------------------------------------------------------------
     elif message.text == '🚪 Разлогинится':  # При вводе 🚪 Разлогинится будет ->
         try:  # Встроенная функция поиска исключения
@@ -234,6 +247,505 @@ async def state_auth(message: types.Message, state: FSMContext):
             await state.finish()  # Завершаем шаг
 
 
+async def diary_timetable_week(message: types.Message, state: FSMContext):
+    if message.text == '🔙 Вернуться':
+        await message.answer(f'Выход в главное меню', reply_markup=keyboards_client_step3, parse_mode='Markdown')
+        await state.finish()
+    elif message.text == '⬅️ Предыдущая':
+        await message.answer(f'Неделя: {date.today() - timedelta(days=7)}-{date.today()}', parse_mode='Markdown')
+        await message.answer(f'Выберите день недели!', reply_markup=keyboards_client_step6, parse_mode='Markdown')
+        async with state.proxy() as data:
+            data['timetable_week'] = message.text  # Хранение Подтверждения пароля пользователя Сетевым городом
+        await LocalFSM.next()  # Следующий шаг по обработчику событий -> Выбор школы
+    elif message.text == 'Текущая неделя':
+        await message.answer(f'Неделя: {date.today()}-{date.today() + timedelta(days=7)}', parse_mode='Markdown')
+        await message.answer(f'Выберите день недели!', reply_markup=keyboards_client_step6, parse_mode='Markdown')
+        async with state.proxy() as data:
+            data['timetable_week'] = message.text  # Хранение Подтверждения пароля пользователя Сетевым городом
+        await LocalFSM.next()  # Следующий шаг по обработчику событий -> Выбор школы
+    elif message.text == 'Следующая ➡️':
+        await message.answer(f'Неделя: {date.today() + timedelta(days=7)}-{date.today() + timedelta(days=14)}',
+                             parse_mode='Markdown')
+        await message.answer(f'Выберите день недели!', reply_markup=keyboards_client_step6, parse_mode='Markdown')
+        async with state.proxy() as data:
+            data['timetable_week'] = message.text  # Хранение Подтверждения пароля пользователя Сетевым городом
+        await LocalFSM.next()  # Следующий шаг по обработчику событий -> Выбор школы
+
+
+async def diary_timetable_day(message: types.Message, state: FSMContext):
+    json_data = read_json("data/data.json")  # Получаем данные из файла
+    user = User()  # Создаём экземпляр класса
+    user.user_login = json_data['user_login']  # Записываем данные в класс Пользователь из файла
+    user.password = json_data['password']
+    user.school_name = json_data['school_name']
+    connection = NetSchoolAPI(user.url)
+    await connection.login(user.user_login, user.password, user.school_name)  # Логинимся
+    current_date = date.today()
+    if current_date.weekday() != 0:
+        current_date = current_date - timedelta(days=current_date.weekday())
+
+    async with state.proxy() as data:
+        if data['timetable_week'] == "⬅️ Предыдущая":
+            week_start = current_date - timedelta(days=7)
+            week_end = current_date
+            current_diary = await connection.diary(week_start, week_end)
+        if data['timetable_week'] == "Текущая неделя":
+            current_diary = await connection.diary()
+        if data['timetable_week'] == "Следующая ➡️":
+            week_start = current_date + timedelta(days=7)
+            week_end = current_date + timedelta(days=14)
+            current_diary = await connection.diary(week_start, week_end)
+    if len(current_diary.schedule[0].lessons) > 2:
+        week = {
+            'monday': current_diary.schedule[0],
+            'tuesday': current_diary.schedule[1],
+            'wednesday': current_diary.schedule[2],
+            'thursday': current_diary.schedule[3],
+            'friday': current_diary.schedule[4],
+            'saturday': current_diary.schedule[5]
+        }
+        # Правка массива если у него есть -1 урок
+        for i in range(len(week['monday'].lessons)):
+            if week['monday'].lessons[i].number == -1:
+                week['monday'].lessons.insert(0, week['monday'].lessons[i])
+                week['monday'].lessons.pop(i + 1)
+
+        for i in range(len(week['tuesday'].lessons)):
+            if week['tuesday'].lessons[i].number == -1:
+                week['tuesday'].lessons.insert(0, week['tuesday'].lessons[i])
+                week['tuesday'].lessons.pop(i + 1)
+
+        for i in range(len(week['wednesday'].lessons)):
+            if week['wednesday'].lessons[i].number == -1:
+                week['wednesday'].lessons.insert(0, week['wednesday'].lessons[i])
+                week['wednesday'].lessons.pop(i + 1)
+
+        for i in range(len(week['thursday'].lessons)):
+            if week['thursday'].lessons[i].number == -1:
+                week['thursday'].lessons.insert(0, week['thursday'].lessons[i])
+                week['thursday'].lessons.pop(i + 1)
+
+        for i in range(len(week['friday'].lessons)):
+            if week['friday'].lessons[i].number == -1:
+                week['friday'].lessons.insert(0, week['friday'].lessons[i])
+                week['friday'].lessons.pop(i + 1)
+
+        for i in range(len(week['saturday'].lessons)):
+            if week['saturday'].lessons[i].number == -1:
+                week['saturday'].lessons.insert(0, week['saturday'].lessons[i])
+                week['saturday'].lessons.pop(i + 1)
+
+    else:
+        current_diary.schedule = 'Каникулы'
+        week = {
+            'monday': current_diary.schedule,
+            'tuesday': current_diary.schedule,
+            'wednesday': current_diary.schedule,
+            'thursday': current_diary.schedule,
+            'friday': current_diary.schedule,
+            'saturday': current_diary.schedule
+        }
+
+    if message.text == '🔙.':
+        await message.answer(f'Вышел к неделям',
+                             reply_markup=keyboards_client_step5, parse_mode='Markdown')
+        await LocalFSM.previous()
+    elif message.text == 'ПН':
+        await message.answer(f'Расписание на понедельник:', parse_mode='Markdown')
+        if week['monday'] == 'Каникулы':
+            await message.answer("Каникулы", reply_markup=keyboards_client_step6)
+        else:
+            print(week['monday'].lessons)
+            for i in range(len(week['monday'].lessons)):
+                await message.answer(
+                    f'{str(week["monday"].lessons[i].number).rjust(2, " ")}. {week["monday"].lessons[i].subject.ljust(17, " ")}'
+                    f' | {week["monday"].lessons[i].start.strftime("%H:%M")}-{week["monday"].lessons[i].end.strftime("%H:%M")}'
+                    f' | {week["monday"].lessons[i].room}', reply_markup=keyboards_client_step6)
+    elif message.text == 'ВТ':
+        await message.answer(f'Расписание на вторник:', parse_mode='Markdown')
+        if week['monday'] == 'Каникулы':
+            await message.answer("Каникулы", reply_markup=keyboards_client_step6)
+        else:
+            print(week['tuesday'].lessons)
+            for i in range(len(week['tuesday'].lessons)):
+                await message.answer(
+                    f'{str(week["tuesday"].lessons[i].number).rjust(2, " ")}. {week["tuesday"].lessons[i].subject.ljust(17, " ")}'
+                    f' | {week["tuesday"].lessons[i].start.strftime("%H:%M")}-{week["tuesday"].lessons[i].end.strftime("%H:%M")}'
+                    f' | {week["tuesday"].lessons[i].room}', reply_markup=keyboards_client_step6)
+    elif message.text == 'СР':
+        await message.answer(f'Расписание на среду:', parse_mode='Markdown')
+        if week['monday'] == 'Каникулы':
+            await message.answer("Каникулы", reply_markup=keyboards_client_step6)
+        else:
+            print(week['wednesday'].lessons)
+            for i in range(len(week['wednesday'].lessons)):
+                await message.answer(
+                    f'{str(week["wednesday"].lessons[i].number).rjust(2, " ")}. {week["wednesday"].lessons[i].subject.ljust(17, " ")}'
+                    f' | {week["wednesday"].lessons[i].start.strftime("%H:%M")}-{week["wednesday"].lessons[i].end.strftime("%H:%M")}'
+                    f' | {week["wednesday"].lessons[i].room}', reply_markup=keyboards_client_step6)
+    elif message.text == 'ЧТ':
+        await message.answer(f'Расписание на четверг:', parse_mode='Markdown')
+        if week['monday'] == 'Каникулы':
+            await message.answer("Каникулы", reply_markup=keyboards_client_step6)
+        else:
+            print(week['thursday'].lessons)
+            for i in range(len(week['thursday'].lessons)):
+                await message.answer(
+                    f'{str(week["thursday"].lessons[i].number).rjust(2, " ")}. {week["thursday"].lessons[i].subject.ljust(17, " ")}'
+                    f' | {week["thursday"].lessons[i].start.strftime("%H:%M")}-{week["thursday"].lessons[i].end.strftime("%H:%M")}'
+                    f' | {week["thursday"].lessons[i].room}', reply_markup=keyboards_client_step6)
+    elif message.text == 'ПТ':
+        await message.answer(f'Расписание на пятницу:', parse_mode='Markdown')
+        if week['monday'] == 'Каникулы':
+            await message.answer("Каникулы", reply_markup=keyboards_client_step6)
+        else:
+            print(week['friday'].lessons)
+            for i in range(len(week['friday'].lessons)):
+                await message.answer(
+                    f'{str(week["friday"].lessons[i].number).rjust(2, " ")}. {week["friday"].lessons[i].subject.ljust(17, " ")}'
+                    f' | {week["friday"].lessons[i].start.strftime("%H:%M")}-{week["friday"].lessons[i].end.strftime("%H:%M")}'
+                    f' | {week["friday"].lessons[i].room}', reply_markup=keyboards_client_step6)
+    elif message.text == 'СБ':
+        await message.answer(f'Расписание на субботу:', parse_mode='Markdown')
+        if week['monday'] == 'Каникулы':
+            await message.answer("Каникулы", reply_markup=keyboards_client_step6)
+        else:
+            print(week['saturday'].lessons)
+            for i in range(len(week['saturday'].lessons)):
+                await message.answer(
+                    f'{str(week["saturday"].lessons[i].number).rjust(2, " ")}. {week["saturday"].lessons[i].subject.ljust(17, " ")}'
+                    f' | {week["saturday"].lessons[i].start.strftime("%H:%M")}-{week["saturday"].lessons[i].end.strftime("%H:%M")}'
+                    f' | {week["saturday"].lessons[i].room}', reply_markup=keyboards_client_step6)
+
+
+async def diary_homework_week(message: types.Message, state: FSMContext):
+    if message.text == '.🔙 Вернуться':
+        await message.answer(f'Выход в главное меню', reply_markup=keyboards_client_step3, parse_mode='Markdown')
+        await state.finish()
+    elif message.text == '.⬅️ Предыдущая':
+        await message.answer(f'Неделя: {date.today() - timedelta(days=7)}-{date.today()}', parse_mode='Markdown')
+        await message.answer(f'Выберите день недели!', reply_markup=keyboards_client_step9, parse_mode='Markdown')
+        async with state.proxy() as data:
+            data['homework_week'] = message.text  # Хранение Подтверждения пароля пользователя Сетевым городом
+        await LocalFSM.next()  # Следующий шаг по обработчику событий -> Выбор школы
+    elif message.text == '.Текущая неделя':
+        await message.answer(f'Неделя: {date.today()}-{date.today() + timedelta(days=7)}', parse_mode='Markdown')
+        await message.answer(f'Выберите день недели!', reply_markup=keyboards_client_step9, parse_mode='Markdown')
+        async with state.proxy() as data:
+            data['homework_week'] = message.text  # Хранение Подтверждения пароля пользователя Сетевым городом
+        await LocalFSM.next()  # Следующий шаг по обработчику событий -> Выбор школы
+    elif message.text == '.Следующая ➡️':
+        await message.answer(f'Неделя: {date.today() + timedelta(days=7)}-{date.today() + timedelta(days=14)}',
+                             parse_mode='Markdown')
+        await message.answer(f'Выберите день недели!', reply_markup=keyboards_client_step9, parse_mode='Markdown')
+        async with state.proxy() as data:
+            data['homework_week'] = message.text  # Хранение Подтверждения пароля пользователя Сетевым городом
+        await LocalFSM.next()  # Следующий шаг по обработчику событий -> Выбор школы
+
+
+async def diary_homework_day(message: types.Message, state: FSMContext):
+    json_data = read_json("data/data.json")  # Получаем данные из файла
+    user = User()  # Создаём экземпляр класса
+    user.user_login = json_data['user_login']  # Записываем данные в класс Пользователь из файла
+    user.password = json_data['password']
+    user.school_name = json_data['school_name']
+    connection = NetSchoolAPI(user.url)
+    await connection.login(user.user_login, user.password, user.school_name)  # Логинимся
+    current_date = date.today()
+    if current_date.weekday() != 0:
+        current_date = current_date - timedelta(days=current_date.weekday())
+
+    async with state.proxy() as data:
+        if data['homework_week'] == ".⬅️ Предыдущая":
+            week_start = current_date - timedelta(days=7)
+            week_end = current_date
+            current_diary = await connection.diary(week_start, week_end)
+        if data['homework_week'] == ".Текущая неделя":
+            current_diary = await connection.diary()
+        if data['homework_week'] == ".Следующая ➡️":
+            week_start = current_date + timedelta(days=7)
+            week_end = current_date + timedelta(days=14)
+            current_diary = await connection.diary(week_start, week_end)
+    if len(current_diary.schedule[0].lessons) > 2:
+        week = {
+            'monday': current_diary.schedule[0],
+            'tuesday': current_diary.schedule[1],
+            'wednesday': current_diary.schedule[2],
+            'thursday': current_diary.schedule[3],
+            'friday': current_diary.schedule[4],
+            'saturday': current_diary.schedule[5]
+        }
+        # Правка массива если у него есть -1 урок
+        for i in range(len(week['monday'].lessons)):
+            if week['monday'].lessons[i].number == -1:
+                week['monday'].lessons.insert(0, week['monday'].lessons[i])
+                week['monday'].lessons.pop(i + 1)
+
+        for i in range(len(week['tuesday'].lessons)):
+            if week['tuesday'].lessons[i].number == -1:
+                week['tuesday'].lessons.insert(0, week['tuesday'].lessons[i])
+                week['tuesday'].lessons.pop(i + 1)
+
+        for i in range(len(week['wednesday'].lessons)):
+            if week['wednesday'].lessons[i].number == -1:
+                week['wednesday'].lessons.insert(0, week['wednesday'].lessons[i])
+                week['wednesday'].lessons.pop(i + 1)
+
+        for i in range(len(week['thursday'].lessons)):
+            if week['thursday'].lessons[i].number == -1:
+                week['thursday'].lessons.insert(0, week['thursday'].lessons[i])
+                week['thursday'].lessons.pop(i + 1)
+
+        for i in range(len(week['friday'].lessons)):
+            if week['friday'].lessons[i].number == -1:
+                week['friday'].lessons.insert(0, week['friday'].lessons[i])
+                week['friday'].lessons.pop(i + 1)
+
+        for i in range(len(week['saturday'].lessons)):
+            if week['saturday'].lessons[i].number == -1:
+                week['saturday'].lessons.insert(0, week['saturday'].lessons[i])
+                week['saturday'].lessons.pop(i + 1)
+
+    else:
+        current_diary.schedule = 'Каникулы'
+        week = {
+            'monday': current_diary.schedule,
+            'tuesday': current_diary.schedule,
+            'wednesday': current_diary.schedule,
+            'thursday': current_diary.schedule,
+            'friday': current_diary.schedule,
+            'saturday': current_diary.schedule
+        }
+
+    if message.text == '.🔙.':
+        await message.answer(f'Вышел к неделям',
+                             reply_markup=keyboards_client_step8, parse_mode='Markdown')
+        await LocalFSM.previous()
+    elif message.text == '.ПН':
+        await message.answer(f'Домашнее задание на понедельник:', parse_mode='Markdown')
+        if week['monday'] == 'Каникулы':
+            await message.answer("Каникулы", reply_markup=keyboards_client_step9)
+        else:
+            for i in range(len(week['monday'].lessons)):
+                await message.answer(
+                    f'{str(week["monday"].lessons[i].number).rjust(2, " ")}. {week["monday"].lessons[i].subject.ljust(17, " ")}'
+                    f' \n {week["monday"].lessons[i].assignments[0].content}', reply_markup=keyboards_client_step9)
+    elif message.text == '.ВТ':
+        await message.answer(f'Домашнее задание вторник:', parse_mode='Markdown')
+        if week['monday'] == 'Каникулы':
+            await message.answer("Каникулы", reply_markup=keyboards_client_step9)
+        else:
+            print(week['tuesday'].lessons)
+            for i in range(len(week['tuesday'].lessons)):
+                await message.answer(
+                    f'{str(week["monday"].lessons[i].number).rjust(2, " ")}. {week["monday"].lessons[i].subject.ljust(17, " ")}'
+                    f' \n {week["monday"].lessons[i].assignments[0].content}', reply_markup=keyboards_client_step9)
+    elif message.text == '.СР':
+        await message.answer(f'Домашнее задание на среду:', parse_mode='Markdown')
+        if week['monday'] == 'Каникулы':
+            await message.answer("Каникулы", reply_markup=keyboards_client_step9)
+        else:
+            print(week['wednesday'].lessons)
+            for i in range(len(week['wednesday'].lessons)):
+                await message.answer(
+                    f'{str(week["monday"].lessons[i].number).rjust(2, " ")}. {week["monday"].lessons[i].subject.ljust(17, " ")}'
+                    f' \n {week["monday"].lessons[i].assignments[0].content}', reply_markup=keyboards_client_step9)
+    elif message.text == '.ЧТ':
+        await message.answer(f'Домашнее задание на четверг:', parse_mode='Markdown')
+        if week['monday'] == 'Каникулы':
+            await message.answer("Каникулы", reply_markup=keyboards_client_step9)
+        else:
+            print(week['thursday'].lessons)
+            for i in range(len(week['thursday'].lessons)):
+                await message.answer(
+                    f'{str(week["monday"].lessons[i].number).rjust(2, " ")}. {week["monday"].lessons[i].subject.ljust(17, " ")}'
+                    f' \n {week["monday"].lessons[i].assignments[0].content}', reply_markup=keyboards_client_step9)
+    elif message.text == '.ПТ':
+        await message.answer(f'Домашнее задание на пятницу:', parse_mode='Markdown')
+        if week['monday'] == 'Каникулы':
+            await message.answer("Каникулы", reply_markup=keyboards_client_step9)
+        else:
+            print(week['friday'].lessons)
+            for i in range(len(week['friday'].lessons)):
+                await message.answer(
+                    f'{str(week["monday"].lessons[i].number).rjust(2, " ")}. {week["monday"].lessons[i].subject.ljust(17, " ")}'
+                    f' \n {week["monday"].lessons[i].assignments[0].content}', reply_markup=keyboards_client_step9)
+    elif message.text == '.СБ':
+        await message.answer(f'Домашнее задание на субботу:', parse_mode='Markdown')
+        if week['monday'] == 'Каникулы':
+            await message.answer("Каникулы", reply_markup=keyboards_client_step9)
+        else:
+            print(week['saturday'].lessons)
+            for i in range(len(week['saturday'].lessons)):
+                await message.answer(
+                    f'{str(week["monday"].lessons[i].number).rjust(2, " ")}. {week["monday"].lessons[i].subject.ljust(17, " ")}'
+                    f' \n {week["monday"].lessons[i].assignments[0].content}', reply_markup=keyboards_client_step9)
+
+
+async def diary_marks_week(message: types.Message, state: FSMContext):
+    if message.text == '.🔙 Вернуться.':
+        await message.answer(f'Выход в главное меню', reply_markup=keyboards_client_step3, parse_mode='Markdown')
+        await state.finish()
+    elif message.text == '.⬅️ Предыдущая.':
+        await message.answer(f'Неделя: {date.today() - timedelta(days=7)}-{date.today()}', parse_mode='Markdown')
+        await message.answer(f'Выберите день недели!', reply_markup=keyboards_client_step11, parse_mode='Markdown')
+        async with state.proxy() as data:
+            data['mark_week'] = message.text  # Хранение Подтверждения пароля пользователя Сетевым городом
+        await LocalFSM.next()  # Следующий шаг по обработчику событий -> Выбор школы
+    elif message.text == '.Текущая неделя.':
+        await message.answer(f'Неделя: {date.today()}-{date.today() + timedelta(days=7)}', parse_mode='Markdown')
+        await message.answer(f'Выберите день недели!', reply_markup=keyboards_client_step11, parse_mode='Markdown')
+        async with state.proxy() as data:
+            data['mark_week'] = message.text  # Хранение Подтверждения пароля пользователя Сетевым городом
+        await LocalFSM.next()  # Следующий шаг по обработчику событий -> Выбор школы
+    elif message.text == '.Следующая ➡️.':
+        await message.answer(f'Неделя: {date.today() + timedelta(days=7)}-{date.today() + timedelta(days=14)}',
+                             parse_mode='Markdown')
+        await message.answer(f'Выберите день недели!', reply_markup=keyboards_client_step11, parse_mode='Markdown')
+        async with state.proxy() as data:
+            data['mark_week'] = message.text  # Хранение Подтверждения пароля пользователя Сетевым городом
+        await LocalFSM.next()  # Следующий шаг по обработчику событий -> Выбор школы
+
+
+async def diary_marks_day(message: types.Message, state: FSMContext):
+    json_data = read_json("data/data.json")  # Получаем данные из файла
+    user = User()  # Создаём экземпляр класса
+    user.user_login = json_data['user_login']  # Записываем данные в класс Пользователь из файла
+    user.password = json_data['password']
+    user.school_name = json_data['school_name']
+    connection = NetSchoolAPI(user.url)
+    await connection.login(user.user_login, user.password, user.school_name)  # Логинимся
+    current_date = date.today()
+    if current_date.weekday() != 0:
+        current_date = current_date - timedelta(days=current_date.weekday())
+
+    async with state.proxy() as data:
+        if data['mark_week'] == ".⬅️ Предыдущая.":
+            week_start = current_date - timedelta(days=7)
+            week_end = current_date
+            current_diary = await connection.diary(week_start, week_end)
+        if data['mark_week'] == ".Текущая неделя.":
+            current_diary = await connection.diary()
+        if data['mark_week'] == ".Следующая ➡️.":
+            week_start = current_date + timedelta(days=7)
+            week_end = current_date + timedelta(days=14)
+            current_diary = await connection.diary(week_start, week_end)
+    if len(current_diary.schedule[0].lessons) > 2:
+        week = {
+            'monday': current_diary.schedule[0],
+            'tuesday': current_diary.schedule[1],
+            'wednesday': current_diary.schedule[2],
+            'thursday': current_diary.schedule[3],
+            'friday': current_diary.schedule[4],
+            'saturday': current_diary.schedule[5]
+        }
+        # Правка массива если у него есть -1 урок
+        for i in range(len(week['monday'].lessons)):
+            if week['monday'].lessons[i].number == -1:
+                week['monday'].lessons.insert(0, week['monday'].lessons[i])
+                week['monday'].lessons.pop(i + 1)
+
+        for i in range(len(week['tuesday'].lessons)):
+            if week['tuesday'].lessons[i].number == -1:
+                week['tuesday'].lessons.insert(0, week['tuesday'].lessons[i])
+                week['tuesday'].lessons.pop(i + 1)
+
+        for i in range(len(week['wednesday'].lessons)):
+            if week['wednesday'].lessons[i].number == -1:
+                week['wednesday'].lessons.insert(0, week['wednesday'].lessons[i])
+                week['wednesday'].lessons.pop(i + 1)
+
+        for i in range(len(week['thursday'].lessons)):
+            if week['thursday'].lessons[i].number == -1:
+                week['thursday'].lessons.insert(0, week['thursday'].lessons[i])
+                week['thursday'].lessons.pop(i + 1)
+
+        for i in range(len(week['friday'].lessons)):
+            if week['friday'].lessons[i].number == -1:
+                week['friday'].lessons.insert(0, week['friday'].lessons[i])
+                week['friday'].lessons.pop(i + 1)
+
+        for i in range(len(week['saturday'].lessons)):
+            if week['saturday'].lessons[i].number == -1:
+                week['saturday'].lessons.insert(0, week['saturday'].lessons[i])
+                week['saturday'].lessons.pop(i + 1)
+
+    else:
+        current_diary.schedule = 'Каникулы'
+        week = {
+            'monday': current_diary.schedule,
+            'tuesday': current_diary.schedule,
+            'wednesday': current_diary.schedule,
+            'thursday': current_diary.schedule,
+            'friday': current_diary.schedule,
+            'saturday': current_diary.schedule
+        }
+
+    if message.text == '🔙..':
+        await message.answer(f'Вышел к неделям',
+                             reply_markup=keyboards_client_step10, parse_mode='Markdown')
+        await LocalFSM.previous()
+    elif message.text == '.ПН.':
+        await message.answer(f'Оценка за понедельник:', parse_mode='Markdown')
+        if week['monday'] == 'Каникулы':
+            await message.answer("Каникулы", reply_markup=keyboards_client_step11)
+        else:
+            for i in range(len(week['monday'].lessons)):
+                await message.answer(
+                    f'{str(week["monday"].lessons[i].number).rjust(2, " ")}. {week["monday"].lessons[i].subject.ljust(17, " ")}'
+                    f' \n {week["monday"].lessons[i].assignments[0].mark}', reply_markup=keyboards_client_step11)
+    elif message.text == '.ВТ.':
+        await message.answer(f'Оценка за вторник:', parse_mode='Markdown')
+        if week['monday'] == 'Каникулы':
+            await message.answer("Каникулы", reply_markup=keyboards_client_step11)
+        else:
+            print(week['tuesday'].lessons)
+            for i in range(len(week['tuesday'].lessons)):
+                await message.answer(
+                    f'{str(week["monday"].lessons[i].number).rjust(2, " ")}. {week["monday"].lessons[i].subject.ljust(17, " ")}'
+                    f' \n {week["monday"].lessons[i].assignments[0].mark}', reply_markup=keyboards_client_step11)
+    elif message.text == '.СР.':
+        await message.answer(f'Оценка за среду:', parse_mode='Markdown')
+        if week['monday'] == 'Каникулы':
+            await message.answer("Каникулы", reply_markup=keyboards_client_step11)
+        else:
+            print(week['wednesday'].lessons)
+            for i in range(len(week['wednesday'].lessons)):
+                await message.answer(
+                    f'{str(week["monday"].lessons[i].number).rjust(2, " ")}. {week["monday"].lessons[i].subject.ljust(17, " ")}'
+                    f' \n {week["monday"].lessons[i].assignments[0].mark}', reply_markup=keyboards_client_step11)
+    elif message.text == '.ЧТ.':
+        await message.answer(f'Оценка за четверг:', parse_mode='Markdown')
+        if week['monday'] == 'Каникулы':
+            await message.answer("Каникулы", reply_markup=keyboards_client_step11)
+        else:
+            print(week['thursday'].lessons)
+            for i in range(len(week['thursday'].lessons)):
+                await message.answer(
+                    f'{str(week["monday"].lessons[i].number).rjust(2, " ")}. {week["monday"].lessons[i].subject.ljust(17, " ")}'
+                    f' \n {week["monday"].lessons[i].assignments[0].mark}', reply_markup=keyboards_client_step11)
+    elif message.text == '.ПТ.':
+        await message.answer(f'Оценка за пятницу:', parse_mode='Markdown')
+        if week['monday'] == 'Каникулы':
+            await message.answer("Каникулы", reply_markup=keyboards_client_step11)
+        else:
+            print(week['friday'].lessons)
+            for i in range(len(week['friday'].lessons)):
+                await message.answer(
+                    f'{str(week["monday"].lessons[i].number).rjust(2, " ")}. {week["monday"].lessons[i].subject.ljust(17, " ")}'
+                    f' \n {week["monday"].lessons[i].assignments[0].mark}', reply_markup=keyboards_client_step11)
+    elif message.text == '.СБ.':
+        await message.answer(f'Оценка за субботу:', parse_mode='Markdown')
+        if week['monday'] == 'Каникулы':
+            await message.answer("Каникулы", reply_markup=keyboards_client_step11)
+        else:
+            print(week['saturday'].lessons)
+            for i in range(len(week['saturday'].lessons)):
+                await message.answer(
+                    f'{str(week["monday"].lessons[i].number).rjust(2, " ")}. {week["monday"].lessons[i].subject.ljust(17, " ")}'
+                    f' \n {week["monday"].lessons[i].assignments[0].mark}', reply_markup=keyboards_client_step11)
+
+
 # Функция регистрации диспетчеров-обработчиков в системе - чтобы не писать каждый обработчик в шапке
 def registration_handler_client(disp: Dispatcher):
     disp.register_message_handler(start, commands=['start'])
@@ -243,3 +755,9 @@ def registration_handler_client(disp: Dispatcher):
     disp.register_message_handler(state_password, state=LocalFSM.password)
     disp.register_message_handler(state_password_conf, state=LocalFSM.password_conf)
     disp.register_message_handler(state_auth, state=LocalFSM.auth)
+    disp.register_message_handler(diary_timetable_week, content_types=['text'], state=LocalFSM.timetable_week)
+    disp.register_message_handler(diary_timetable_day, content_types=['text'], state=LocalFSM.timetable_day)
+    disp.register_message_handler(diary_homework_week, content_types=['text'], state=LocalFSM.homework_week)
+    disp.register_message_handler(diary_homework_day, content_types=['text'], state=LocalFSM.homework_day)
+    disp.register_message_handler(diary_marks_week, content_types=['text'], state=LocalFSM.mark_week)
+    disp.register_message_handler(diary_marks_day, content_types=['text'], state=LocalFSM.mark_day)

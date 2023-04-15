@@ -26,6 +26,7 @@ async def diary():
     diary = await ns.diary()  # Запрашиваем дневник
     return diary
 
+
 # Пример работы с АПИ
 # async def main():
 #     ns = NetSchoolAPI('https://region.obramur.ru')
